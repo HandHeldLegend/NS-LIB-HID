@@ -91,8 +91,13 @@ void ns_motion_update_quaternion(ns_quaternion_s *state, ns_motion_quat_integrat
     if (integrator->prev_timestamp_us != 0 && sample->timestamp_us > integrator->prev_timestamp_us)
     {
         dt = (float)(sample->timestamp_us - integrator->prev_timestamp_us) / 1000000.0f;
+        /* Safety net only: cap runaway Δt if scheduling stalls (nominal step is ~2 ms). */
+        if (dt > 0.008f)
+        {
+            dt = 0.008f;
+        }
     }
-    
+
     integrator->prev_timestamp_us = sample->timestamp_us;
 
     float scale_dt = gyro_rad_per_lsb * dt;
