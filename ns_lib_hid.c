@@ -294,7 +294,7 @@ static const uint8_t k_ns_usb_config_descriptor[NS_HID_USB_CONFIG_DESCRIPTOR_LEN
     3,    /* bmAttributes         = Interrupt */
     64,   /* wMaxPacketSize (lo)  = 64 bytes */
     0,    /* wMaxPacketSize (hi) */
-    1,    /* bInterval            = 1ms */
+    8,    /* bInterval            = 8ms (matches retail Pro Controller) */
 
     /* Endpoint Descriptor: EP1 OUT (Interrupt) */
     7,    /* bLength              = 7 bytes */
@@ -303,7 +303,7 @@ static const uint8_t k_ns_usb_config_descriptor[NS_HID_USB_CONFIG_DESCRIPTOR_LEN
     3,    /* bmAttributes         = Interrupt */
     64,   /* wMaxPacketSize (lo)  = 64 bytes */
     0,    /* wMaxPacketSize (hi) */
-    1,    /* bInterval            = 1ms */
+    8,    /* bInterval            = 8ms (matches retail Pro Controller) */
 };
 
 const uint8_t k_ns_usb_webusb_config_descriptor[NS_HID_USB_WEBUSB_CONFIG_DESCRIPTOR_LEN] = {
@@ -347,7 +347,7 @@ const uint8_t k_ns_usb_webusb_config_descriptor[NS_HID_USB_WEBUSB_CONFIG_DESCRIP
     3,    /* bmAttributes         = Interrupt */
     64,   /* wMaxPacketSize (lo)  = 64 bytes */
     0,    /* wMaxPacketSize (hi) */
-    1,    /* bInterval            = 1ms */
+    8,    /* bInterval            = 8ms (matches retail Pro Controller) */
 
     /* Endpoint Descriptor: EP1 OUT (Interrupt) */
     7,    /* bLength              = 7 bytes */
@@ -356,7 +356,7 @@ const uint8_t k_ns_usb_webusb_config_descriptor[NS_HID_USB_WEBUSB_CONFIG_DESCRIP
     3,    /* bmAttributes         = Interrupt */
     64,   /* wMaxPacketSize (lo)  = 64 bytes */
     0,    /* wMaxPacketSize (hi) */
-    1,    /* bInterval            = 1ms */
+    8,    /* bInterval            = 8ms (matches retail Pro Controller) */
 
     /* Interface Descriptor 1 (Vendor-specific) */
     9,    /* bLength              = 9 bytes */
