@@ -48,6 +48,7 @@ typedef union
     struct
     {
         uint32_t data : 30;
+        /* PackFormat (bits 31:30). Equals sample count only for 5-bit encodings. */
         uint32_t frame_count : 2;
     };
 
@@ -86,7 +87,7 @@ typedef union
     struct
     {
         uint32_t high_select : 1;
-        uint32_t blank : 1;
+        uint32_t blank : 1; /* IsThree7bit; official firmware requires 1 */
         uint32_t freq_select : 1;
         uint32_t cmd_hi_2 : 5;
         uint32_t cmd_lo_2 : 5;

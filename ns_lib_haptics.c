@@ -264,6 +264,7 @@ static inline uint8_t _apply_command_freq(ns_lib_haptic_action_t action, int16_t
 
 static void _haptics_decode_type_1(const ns_lib_haptic_wire_u *encoded, ns_haptics_packet_raw_s *out)
 {
+    /* 5-bit encodings: PackFormat is the number of 5-bit sample pairs (1, 2, or 3). */
     uint8_t samples = encoded->frame_count;
     out->sample_count = samples;
 
@@ -312,8 +313,8 @@ static void _haptics_decode_type_1(const ns_lib_haptic_wire_u *encoded, ns_hapti
 
 static void _haptics_decode_type_2(const ns_lib_haptic_wire_u *encoded, ns_haptics_packet_raw_s *out)
 {
-    uint8_t samples = encoded->frame_count;
-    out->sample_count = samples;
+    /* one7bit / FormatOne28bit: always one absolute 7-bit sample pair. */
+    out->sample_count = 1;
 
     out->state.hi_frequency_idx = (uint8_t)encoded->type2.freq_hi;
     out->state.lo_frequency_idx = (uint8_t)encoded->type2.freq_lo;
@@ -328,45 +329,40 @@ static void _haptics_decode_type_3(const ns_lib_haptic_wire_u *encoded, ns_hapti
     ns_lib_haptic_5bit_cmd_s hi_cmd = {0};
     ns_lib_haptic_5bit_cmd_s low_cmd = {0};
 
-    uint8_t samples = encoded->frame_count;
-    out->sample_count = samples;
+    /* two7bit / FormatTwo14bit: always two samples. PackFormat is 2, but do not
+     * treat that field as a generic sample counter — type 4 reuses PackFormat 1. */
+    out->sample_count = 2;
 
-    if (samples > 0)
+    if (encoded->type3.high_select)
     {
-        if (encoded->type3.high_select)
-        {
-            out->state.hi_frequency_idx = (uint8_t)encoded->type3.freq_xx_0;
-            out->state.hi_amplitude_idx = _ns_amp_index[encoded->type3.amp_xx_0 & 127u];
+        out->state.hi_frequency_idx = (uint8_t)encoded->type3.freq_xx_0;
+        out->state.hi_amplitude_idx = _ns_amp_index[encoded->type3.amp_xx_0 & 127u];
 
-            low_cmd                     = ns_lib_haptic_cmd_table[encoded->type3.cmd_xx_0];
-            out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
-            out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
-        }
-        else
-        {
-            out->state.lo_frequency_idx = (uint8_t)encoded->type3.freq_xx_0;
-            out->state.lo_amplitude_idx = _ns_amp_index[encoded->type3.amp_xx_0 & 127u];
-
-            hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type3.cmd_xx_0];
-            out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
-            out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
-        }
-
-        memcpy(&out->samples[0], &out->state, sizeof(ns_haptics_sample_raw_s));
-    }
-
-    if (samples > 1)
-    {
-        hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type3.cmd_hi_1];
-        out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
-        out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
-
-        low_cmd                     = ns_lib_haptic_cmd_table[encoded->type3.cmd_lo_1];
+        low_cmd                     = ns_lib_haptic_cmd_table[encoded->type3.cmd_xx_0];
         out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
         out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
-
-        memcpy(&out->samples[1], &out->state, sizeof(ns_haptics_sample_raw_s));
     }
+    else
+    {
+        out->state.lo_frequency_idx = (uint8_t)encoded->type3.freq_xx_0;
+        out->state.lo_amplitude_idx = _ns_amp_index[encoded->type3.amp_xx_0 & 127u];
+
+        hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type3.cmd_xx_0];
+        out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
+        out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
+    }
+
+    memcpy(&out->samples[0], &out->state, sizeof(ns_haptics_sample_raw_s));
+
+    hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type3.cmd_hi_1];
+    out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
+    out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
+
+    low_cmd                     = ns_lib_haptic_cmd_table[encoded->type3.cmd_lo_1];
+    out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
+    out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
+
+    memcpy(&out->samples[1], &out->state, sizeof(ns_haptics_sample_raw_s));
 }
 
 static void _haptics_decode_type_4(const ns_lib_haptic_wire_u *encoded, ns_haptics_packet_raw_s *out)
@@ -374,70 +370,66 @@ static void _haptics_decode_type_4(const ns_lib_haptic_wire_u *encoded, ns_hapti
     ns_lib_haptic_5bit_cmd_s hi_cmd = {0};
     ns_lib_haptic_5bit_cmd_s low_cmd = {0};
 
-    uint8_t samples = encoded->frame_count;
-    out->sample_count = samples;
+    /* three7bit / FormatThree7bit: PackFormat is 1 (shared with one5bit/one7bit),
+     * but official firmware unpacks 3 samples and returns count 3. */
+    out->sample_count = 3;
 
-    if (samples > 0)
+    if (encoded->type4.high_select)
     {
-        if (encoded->type4.high_select)
+        if (encoded->type4.freq_select)
         {
-            if (encoded->type4.freq_select)
-            {
-                out->state.hi_frequency_idx = (uint8_t)encoded->type4.xx_xx_0;
-            }
-            else
-            {
-                out->state.hi_amplitude_idx = _ns_amp_index[encoded->type4.xx_xx_0 & 127u];
-            }
+            out->state.hi_frequency_idx = (uint8_t)encoded->type4.xx_xx_0;
         }
         else
         {
-            if (encoded->type4.freq_select)
-            {
-                out->state.lo_frequency_idx = (uint8_t)encoded->type4.xx_xx_0;
-            }
-            else
-            {
-                out->state.lo_amplitude_idx = _ns_amp_index[encoded->type4.xx_xx_0 & 127u];
-            }
+            out->state.hi_amplitude_idx = _ns_amp_index[encoded->type4.xx_xx_0 & 127u];
         }
-
-        memcpy(&out->samples[0], &out->state, sizeof(ns_haptics_sample_raw_s));
     }
-
-    if (samples > 1)
+    else
     {
-        hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type4.cmd_hi_1];
-        out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
-        out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
-
-        low_cmd                     = ns_lib_haptic_cmd_table[encoded->type4.cmd_lo_1];
-        out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
-        out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
-
-        memcpy(&out->samples[1], &out->state, sizeof(ns_haptics_sample_raw_s));
+        if (encoded->type4.freq_select)
+        {
+            out->state.lo_frequency_idx = (uint8_t)encoded->type4.xx_xx_0;
+        }
+        else
+        {
+            out->state.lo_amplitude_idx = _ns_amp_index[encoded->type4.xx_xx_0 & 127u];
+        }
     }
 
-    if (samples > 2)
-    {
-        hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type4.cmd_hi_2];
-        out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
-        out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
+    memcpy(&out->samples[0], &out->state, sizeof(ns_haptics_sample_raw_s));
 
-        low_cmd                     = ns_lib_haptic_cmd_table[encoded->type4.cmd_lo_2];
-        out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
-        out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
+    hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type4.cmd_hi_1];
+    out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
+    out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
 
-        memcpy(&out->samples[2], &out->state, sizeof(ns_haptics_sample_raw_s));
-    }
+    low_cmd                     = ns_lib_haptic_cmd_table[encoded->type4.cmd_lo_1];
+    out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
+    out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
+
+    memcpy(&out->samples[1], &out->state, sizeof(ns_haptics_sample_raw_s));
+
+    hi_cmd                      = ns_lib_haptic_cmd_table[encoded->type4.cmd_hi_2];
+    out->state.hi_frequency_idx = _apply_command_freq(hi_cmd.fm_action, hi_cmd.fm_offset, out->state.hi_frequency_idx);
+    out->state.hi_amplitude_idx = _apply_command_amp(hi_cmd.am_action, hi_cmd.am_offset, out->state.hi_amplitude_idx);
+
+    low_cmd                     = ns_lib_haptic_cmd_table[encoded->type4.cmd_lo_2];
+    out->state.lo_frequency_idx = _apply_command_freq(low_cmd.fm_action, low_cmd.fm_offset, out->state.lo_frequency_idx);
+    out->state.lo_amplitude_idx = _apply_command_amp(low_cmd.am_action, low_cmd.am_offset, out->state.lo_amplitude_idx);
+
+    memcpy(&out->samples[2], &out->state, sizeof(ns_haptics_sample_raw_s));
 }
 
 static void _haptics_decode_samples_apply(const ns_lib_haptic_wire_u *encoded, ns_haptics_packet_raw_s *out)
 {
     /*
-     * The host can encode rumble updates in a few compact wire formats.
-     * frame_count selects how many sub-samples are present; the remaining bits
-     * determine which decode path reconstructs the new cumulative state.
+     * frame_count is PackFormat (bits 31:30), not a sample counter.
+     * Official firmware disambiguates encodings that share a PackFormat by
+     * testing reserved zero-regions (Joy-Con/Procon UnpackAmFmCodes):
+     *   pack 1: (data & 0xFFFFF)==0 -> one5bit; (data & 3)==0 -> one7bit;
+     *           bit 1 set -> three7bit (3 samples)
+     *   pack 2: (data & 0x3FF)==0 -> two5bit; else two7bit
+     *   pack 3: three5bit
      */
     switch (encoded->frame_count)
     {
