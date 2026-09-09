@@ -131,6 +131,20 @@ uint8_t ns_api_hook_get_random_u8(void);
 void ns_api_hook_set_haptic_packet_raw(ns_haptics_packet_raw_s *packet);
 
 /**
+ * @brief Motor-status nibble for input-report byte 12 (weak).
+ *
+ * Official firmware packs `fill | (strobe << 3)` into one nibble
+ * (`PrepareInputReport` @ 0021a6xx). fill is used_pcm/5 capped at 7
+ * (7 once used >= 40). strobe is 1 when the ring was topped up because
+ * used < 5, and 0 when a new rumble word is ingested. The Switch uses
+ * this byte to decide whether the next vibration pattern should be sent.
+ *
+ * Return the 4-bit nibble (0..15). Protocol writes it to both halves of
+ * byte 12 so left and right motors are paced the same.
+ */
+uint8_t ns_api_hook_get_vibrator_nibble(void);
+
+/**
  * @brief Host-set player LED callback (weak, user-overridable).
  *
  * @param player_leds Host player slot `1`–`8` from SET_PLAYER decoding, or `-1` when disconnected /

@@ -97,6 +97,11 @@ __attribute__((weak)) void ns_api_hook_set_haptic_packet_raw(ns_haptics_packet_r
     (void)&packet;
 }
 
+__attribute__((weak)) uint8_t ns_api_hook_get_vibrator_nibble(void)
+{
+    return 0;
+}
+
 __attribute__((weak)) void ns_api_hook_set_led(int player_leds)
 {
     (void)player_leds;

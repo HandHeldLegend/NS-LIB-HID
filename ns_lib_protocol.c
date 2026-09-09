@@ -323,6 +323,14 @@ static void _ns_protocol_pairing_set(const uint8_t *in, uint8_t *target)
     }
 }
 
+static void _ns_protocol_set_vibrator(uint8_t *out)
+{
+    // Official Procon captures put fill/strobe in the HIGH nibble (type 1).
+    // Leave the low nibble 0 so this matches 0x70 / 0xB0 / 0xC0 traces.
+    uint8_t nibble = (uint8_t)(ns_api_hook_get_vibrator_nibble() & 0x0Fu);
+    out[NS_PROTOCOL_IN_IDX_VIBRATOR] = (uint8_t)(nibble << 4);
+}
+
 static void _ns_protocol_set_standardreport(uint8_t *out)
 {
     // Send standard 0x30 Input Report
@@ -337,6 +345,7 @@ static void _ns_protocol_set_standardreport(uint8_t *out)
     static ns_input_s input = {0};
     ns_api_hook_get_input(&input);
     _ns_protocol_set_inputdata(&input, out);
+    _ns_protocol_set_vibrator(out);
 
     switch (_protocol_sm.imu_mode)
     {
@@ -389,6 +398,7 @@ static void _ns_protocol_command_handler(const uint8_t *in, uint8_t *out)
     static ns_input_s input = {0};
     ns_api_hook_get_input(&input);
     _ns_protocol_set_inputdata(&input, out);
+    _ns_protocol_set_vibrator(out);
 
     _ns_protocol_set_command(command, out);
 
@@ -588,7 +598,14 @@ void ns_protocol_process_outputreport(const uint8_t *in, uint16_t len)
     {
     case NS_LIB_PROTOCOL_OUT_ID_RUMBLE:
         // Process haptics
-        ns_haptics_rumble_translate(&in[2]);
+        if (len >= 10u)
+        {
+            ns_haptics_rumble_translate_stereo(&in[2], &in[6]);
+        }
+        else
+        {
+            ns_haptics_rumble_translate(&in[2]);
+        }
         break;
 
     case NS_LIB_PROTOCOL_OUT_ID_RUMBLE_CMD:
@@ -602,8 +619,14 @@ void ns_protocol_process_outputreport(const uint8_t *in, uint16_t len)
             return;
         }
 
-        // Process haptics
-        ns_haptics_rumble_translate(&in[2]);
+        if (len >= 10u)
+        {
+            ns_haptics_rumble_translate_stereo(&in[2], &in[6]);
+        }
+        else
+        {
+            ns_haptics_rumble_translate(&in[2]);
+        }
         break;
 
     default:
