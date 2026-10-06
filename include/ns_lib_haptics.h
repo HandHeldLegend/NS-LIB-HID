@@ -182,14 +182,6 @@ void ns_haptics_init(void);
  */
 void ns_haptics_rumble_translate(const uint8_t *data);
 
-/**
- * @brief Decode left and right 4-byte rumble words and merge into one packet.
- *
- * Each side keeps its own running AmFm state. The hook receives the louder
- * band of each sample so a right-only UI tick is not dropped.
- */
-void ns_haptics_rumble_translate_stereo(const uint8_t *left, const uint8_t *right);
-
 #ifdef __cplusplus
 }
 #endif

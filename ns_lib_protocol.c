@@ -598,14 +598,7 @@ void ns_protocol_process_outputreport(const uint8_t *in, uint16_t len)
     {
     case NS_LIB_PROTOCOL_OUT_ID_RUMBLE:
         // Process haptics
-        if (len >= 10u)
-        {
-            ns_haptics_rumble_translate_stereo(&in[2], &in[6]);
-        }
-        else
-        {
-            ns_haptics_rumble_translate(&in[2]);
-        }
+        ns_haptics_rumble_translate(&in[NS_PROTOCOL_OUT_HAPTIC_DATA_START]);
         break;
 
     case NS_LIB_PROTOCOL_OUT_ID_RUMBLE_CMD:
@@ -619,14 +612,8 @@ void ns_protocol_process_outputreport(const uint8_t *in, uint16_t len)
             return;
         }
 
-        if (len >= 10u)
-        {
-            ns_haptics_rumble_translate_stereo(&in[2], &in[6]);
-        }
-        else
-        {
-            ns_haptics_rumble_translate(&in[2]);
-        }
+        // Process haptics
+        ns_haptics_rumble_translate(&in[NS_PROTOCOL_OUT_HAPTIC_DATA_START]);
         break;
 
     default:

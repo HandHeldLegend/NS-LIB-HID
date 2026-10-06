@@ -43,7 +43,6 @@ static ns_haptic_defaults_s _ns_haptic_defaults = {
     .max_frequency      = 127
 };
 static ns_haptics_packet_raw_s _ns_raw_state = {0};
-static ns_haptics_packet_raw_s _ns_raw_right = {0};
 
 #define AMPLITUDE_RANGE_START    -8.0f
 #define AMPLITUDE_INTERVAL       0.03125f
@@ -503,7 +502,6 @@ void ns_haptics_init(void)
 {
     _ns_haptics_install_builtin_tables();
     _ns_haptics_reset_raw_state(&_ns_raw_state);
-    _ns_haptics_reset_raw_state(&_ns_raw_right);
 }
 
 void ns_haptics_convert_raw_to_processed(ns_haptics_packet_raw_s *in, ns_haptics_packet_processed_s *out)
@@ -522,81 +520,20 @@ void ns_haptics_convert_raw_to_processed(ns_haptics_packet_raw_s *in, ns_haptics
     out->sample_count = in->sample_count;
 }
 
-static void _ns_haptics_decode_word(const uint8_t *data, ns_haptics_packet_raw_s *st)
-{
-    const ns_lib_haptic_wire_u *encoded = (const ns_lib_haptic_wire_u *)data;
-    // Official UnpackAmFmCodes runs on every OUT report. Two identical
-    // words are two grains; do not skip the decode.
-    _haptics_decode_samples_apply(encoded, st);
-}
-
-static void _ns_haptics_merge_sides(ns_haptics_packet_raw_s *out, bool left_live, bool right_live)
-{
-    const ns_haptics_sample_raw_s zero = {0};
-    const uint8_t ln = left_live ? _ns_raw_state.sample_count : 0u;
-    const uint8_t rn = right_live ? _ns_raw_right.sample_count : 0u;
-    uint8_t n = ln;
-    if (rn > n)
-    {
-        n = rn;
-    }
-    if (n > 3u)
-    {
-        n = 3u;
-    }
-
-    out->sample_count = n;
-    out->state = _ns_raw_state.state;
-    for (uint8_t i = 0; i < 3u; i++)
-    {
-        const ns_haptics_sample_raw_s *l = (i < ln) ? &_ns_raw_state.samples[i] : &zero;
-        const ns_haptics_sample_raw_s *r = (i < rn) ? &_ns_raw_right.samples[i] : &zero;
-        if (l->hi_amplitude_idx >= r->hi_amplitude_idx)
-        {
-            out->samples[i].hi_amplitude_idx = l->hi_amplitude_idx;
-            out->samples[i].hi_frequency_idx = l->hi_frequency_idx;
-        }
-        else
-        {
-            out->samples[i].hi_amplitude_idx = r->hi_amplitude_idx;
-            out->samples[i].hi_frequency_idx = r->hi_frequency_idx;
-        }
-        if (l->lo_amplitude_idx >= r->lo_amplitude_idx)
-        {
-            out->samples[i].lo_amplitude_idx = l->lo_amplitude_idx;
-            out->samples[i].lo_frequency_idx = l->lo_frequency_idx;
-        }
-        else
-        {
-            out->samples[i].lo_amplitude_idx = r->lo_amplitude_idx;
-            out->samples[i].lo_frequency_idx = r->lo_frequency_idx;
-        }
-    }
-}
-
 void ns_haptics_rumble_translate(const uint8_t *data)
 {
-    _ns_haptics_decode_word(data, &_ns_raw_state);
+    /*
+     * Main integration path:
+     *   1) receive the 4-byte left rumble word from the host
+     *   2) decode it into _ns_raw_state.samples[0..2] (table indices only)
+     *   3) hand the packet to ns_api_hook_set_haptic_packet_raw()
+     *
+     * Like the official UnpackAmFmCodes this decodes every word, so two
+     * identical words are two grains. Only the left word is used, which is
+     * what a type-1 (left/Pro) controller plays; the right word is ignored.
+     */
+    _haptics_decode_samples_apply((const ns_lib_haptic_wire_u *)data, &_ns_raw_state);
     ns_api_hook_set_haptic_packet_raw(&_ns_raw_state);
-}
-
-void ns_haptics_rumble_translate_stereo(const uint8_t *left, const uint8_t *right)
-{
-    static ns_haptics_packet_raw_s merged;
-
-    if ((left == NULL) || (right == NULL))
-    {
-        return;
-    }
-
-    _ns_haptics_decode_word(left, &_ns_raw_state);
-    _ns_haptics_decode_word(right, &_ns_raw_right);
-    // Live means this report produced samples. Pack format 0 with a payload
-    // is two7bit, not a stop. Using frame_count==0 here dropped those ticks.
-    _ns_haptics_merge_sides(&merged,
-                           _ns_raw_state.sample_count > 0u,
-                           _ns_raw_right.sample_count > 0u);
-    ns_api_hook_set_haptic_packet_raw(&merged);
 }
 
 void ns_haptics_generate_fixedpoint_frequency_step_tables(uint16_t shift, uint16_t sine_table_width, uint16_t sample_rate_hz,
